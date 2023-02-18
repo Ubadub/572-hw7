@@ -1,0 +1,8 @@
+check_hw7.sh
+example_output/
+examples/
+submit-file-list
+
+__pycache__/
+
+.DS_Store

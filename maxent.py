@@ -2,7 +2,7 @@
 # Feb 22, 2023
 # LING 572 - Winter 23 - Fei Xia
 # HW 7 Question 1
-# beamsearch_maxent.sh
+# maxent.py
 
 import re
 import sys

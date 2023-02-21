@@ -8,6 +8,7 @@
 
 import itertools
 import sys
+import time
 
 import numpy as np
 
@@ -71,15 +72,23 @@ def main():
 
     mapping = me_model.cls_idx2lbl, me_model.cls_lbl2idx, me_model.feat_idx2lbl, me_model.feat_lbl2idx
     
+    tot = 0
+    num_right = 0
     with open(sys_output, 'w') as f_out:
         fprint = FPRINT(f_out)
         fprint(SEP, "test data:")
         i = 1
         for raw_lbls, gold_y, X in  process_input(boundaries, mapping):
-            beam_search_write(fprint, raw_lbls, gold_y, X, me_model, beam_size, topN, topK)
+            num_right += beam_search_write(fprint, raw_lbls, gold_y, X, me_model, beam_size, topN, topK)
+            tot += len(raw_lbls)
+
             if i % 3 == 0:
                 f_out.flush()
             i += 1
 
+    print(f"Accuracy: {num_right} / {tot} =  {num_right / tot}")
+
 if __name__ == '__main__':
+    s = time.time()
     main()
+    print(f"Ran in {(time.time() - s) / 60} minutes.")

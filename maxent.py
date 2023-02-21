@@ -18,7 +18,7 @@ MOD_FILE_CLASS_HEADER_PAT = re.compile(r'^\s*FEATURES\s+FOR\s+CLASS\s+(\S+)\s*$'
 ONE_VEC = np.array([True])
 SEP = '%'*5
 
-def input_data_matrix(input_stream=sys.stdin, mapping=None, dtype=np.int64):
+def input_data_matrix(input_stream=sys.stdin, featt_split=':', mapping=None, dtype=np.int64):
     inst_cls_lbls = []
     inst_feat_lbls = []
     if not mapping:
@@ -67,18 +67,6 @@ def lg_prob_normalize(lg_probs):
     maxes = lg_probs.max(axis=-1, keepdims=True) # so it works for 1 dim arrays too
     norm_const = maxes + np.log10((10.0 ** (lg_probs - maxes)).sum(axis=-1, keepdims=True))
     return lg_probs - norm_const
-
-def output_classification_result(output_stream, header, probs_per_class, true_lbls, mapping, prec=6):
-    cls_idx2lbl, cls_lbl2idx, feat_idx2lbl, feat_lbl2idx = mapping
-    fprint = FPRINT(output_stream)
-    fprint(SEP, header)
-    for inst_idx in range(len(probs_per_class)):
-        true_cls_lbl = cls_idx2lbl[true_lbls[inst_idx][0]]
-        inst_probs = probs_per_class[inst_idx]
-        idx_sort = inst_probs.argsort()[::-1]
-        str_inst_probs = np.array([f'{s:0.{prec}f}' for s in inst_probs])
-        cls_lbls_cond_probs = np.dstack((cls_idx2lbl, str_inst_probs))[:,idx_sort].flatten()
-        fprint(f'array:{inst_idx}', true_cls_lbl, *cls_lbls_cond_probs)
 
 class MaxEntModel:
     @classmethod
@@ -157,6 +145,20 @@ class MaxEntModel:
     def feat_lbl2idx(self):
         return self._feat_lbl2idx
 
+    # def add_class(self, cls_lbl):
+    #     if cls_lbl not in self.cls_lbl2idx:
+    #         cls_idx = self.num_classes
+    #         self._cls_idx2lbl.append(cls_lbl)
+    #         self._cls_lbl2idx[cls_lbl] = cls_idx
+    #     return self.cls_lbl2idx[feat_lbl]
+
+    # def add_feature(self, feat_lbl):
+    #     if feat_lbl not in self.feat_lbl2idx:
+    #         feat_idx = self.num_features
+    #         self._feat_idx2lbl.append(feat_lbl)
+    #         self._feat_lbl2idx[feat_lbl] = feat_idx
+    #     return self.feat_lbl2idx[feat_lbl]
+
     def calc_prob_feat_given_cls(self, X):
         weighted_feats = X * self._cls_feat_wtM
         numer = np.e ** lg_prob_normalize(weighted_feats.sum(axis=1))
@@ -180,56 +182,60 @@ class MaxEntModel:
 
         return resM
 
-    def build_confusion_mat(self, inst_class_probs, y_true):
-        confusionM = np.zeros((self.num_classes, self.num_classes), dtype=np.int64)
-        y_hat_idxs = inst_class_probs.argmax(axis=1)
-        for inst_idx, cls_probs in enumerate(inst_class_probs):
-            true_cls_idx = y_true[inst_idx][0]
-            true_cls_lbl = self.cls_idx2lbl[true_cls_idx]
-            y_hat_cls_idx = cls_probs.argmax()
-            confusionM[true_cls_idx, y_hat_cls_idx] += 1
-        return confusionM
+    # def build_confusion_mat(self, inst_class_probs, y_true):
+    #     confusionM = np.zeros((self.num_classes, self.num_classes), dtype=np.int64)
+    #     y_hat_idxs = inst_class_probs.argmax(axis=1)
+    #     for inst_idx, cls_probs in enumerate(inst_class_probs):
+    #         true_cls_idx = y_true[inst_idx][0]
+    #         true_cls_lbl = self.cls_idx2lbl[true_cls_idx]
+    #         y_hat_cls_idx = cls_probs.argmax()
+    #         confusionM[true_cls_idx, y_hat_cls_idx] += 1
+    #     return confusionM
 
-    def output_confusion_mat(self, confusionM, header, footer='',  tbl_header_spaces=12, output_stream=sys.stdout):
-        num_correct = confusionM.diagonal().sum()
-        tot = confusionM.sum()
-        acc = num_correct / tot
-        fprint = FPRINT(output_stream)
-        fprint(f'Confusion matrix for the {header.lower()} data:')
-        fprint('row is the truth, column is the system output')
-        fprint()
-        fprint(' ' * tbl_header_spaces, *self.cls_idx2lbl)
-        for idx, r in enumerate(confusionM):
-            fprint(self.cls_idx2lbl[idx], *confusionM[idx,:])
-        fprint()
-        fprint(f' {header.capitalize()} accuracy={acc}')
-        fprint(footer, end='')
+    # def output_confusion_mat(self, confusionM, header, footer='',  tbl_header_spaces=12, output_stream=sys.stdout):
+    #     num_correct = confusionM.diagonal().sum()
+    #     tot = confusionM.sum()
+    #     acc = num_correct / tot
+    #     fprint = FPRINT(output_stream)
+    #     fprint(f'Confusion matrix for the {header.lower()} data:')
+    #     fprint('row is the truth, column is the system output')
+    #     fprint()
+    #     fprint(' ' * tbl_header_spaces, *self.cls_idx2lbl)
+    #     for idx, r in enumerate(confusionM):
+    #         fprint(self.cls_idx2lbl[idx], *confusionM[idx,:])
+    #     fprint()
+    #     fprint(f' {header.capitalize()} accuracy={acc}')
+    #     fprint(footer, end='')
 
-    def write(self, model_file):
-        with open(model_file, 'w') as f:
-            fprint = FPRINT(f)
-            fprint(SEP, 'prior prob P(c)', SEP)
-            for cls_idx, cls_lbl in enumerate(self.cls_idx2lbl):
-                fprint(cls_lbl, self.cls_probM[cls_idx,0], self.lg_cls_probM[cls_idx,0])
+    # def output_classification_result(output_stream, header, probs_per_class, true_lbls, mapping, prec=6):
+    #     cls_idx2lbl, cls_lbl2idx, feat_idx2lbl, feat_lbl2idx = mapping
+    #     fprint = FPRINT(output_stream)
+    #     fprint(SEP, header)
+    #     for inst_idx in range(len(probs_per_class)):
+    #         true_cls_lbl = cls_idx2lbl[true_lbls[inst_idx][0]]
+    #         inst_probs = probs_per_class[inst_idx]
+    #         idx_sort = inst_probs.argsort()[::-1]
+    #         str_inst_probs = np.array([f'{s:0.{prec}f}' for s in inst_probs])
+    #         cls_lbls_cond_probs = np.dstack((cls_idx2lbl, str_inst_probs))[:,idx_sort].flatten()
+    #         fprint(f'array:{inst_idx}', true_cls_lbl, *cls_lbls_cond_probs)
 
-            fprint(SEP, 'conditional prob P(f|c)', SEP)
-            for cls_idx, cls_lbl in enumerate(self.cls_idx2lbl):
-                fprint(SEP, 'conditional prob P(f|c)', f'c={cls_lbl}', SEP)
-                for feat_idx, feat_lbl in enumerate(self.feat_idx2lbl):
-                    fprint(feat_lbl, cls_lbl, self.cond_probM[cls_idx,feat_idx], self.lg_cond_probM[cls_idx,feat_idx])
+    # def write(self, model_file):
+    #     with open(model_file, 'w') as f:
+    #         fprint = FPRINT(f)
+    #         fprint(SEP, 'prior prob P(c)', SEP)
+    #         for cls_idx, cls_lbl in enumerate(self.cls_idx2lbl):
+    #             fprint(cls_lbl, self.cls_probM[cls_idx,0], self.lg_cls_probM[cls_idx,0])
+
+    #         fprint(SEP, 'conditional prob P(f|c)', SEP)
+    #         for cls_idx, cls_lbl in enumerate(self.cls_idx2lbl):
+    #             fprint(SEP, 'conditional prob P(f|c)', f'c={cls_lbl}', SEP)
+    #             for feat_idx, feat_lbl in enumerate(self.feat_idx2lbl):
+    #                 fprint(feat_lbl, cls_lbl, self.cond_probM[cls_idx,feat_idx], self.lg_cond_probM[cls_idx,feat_idx])
 
 
 class UniformMaxEntModel(MaxEntModel):
     def __init__(self, cls_idx2lbl, cls_lbl2idx, feat_idx2lbl, feat_lbl2idx):
         super().__init__(None, cls_idx2lbl, cls_lbl2idx, feat_idx2lbl, feat_lbl2idx)
         self._cls_feat_wtM = np.zeros((self.num_classes, self.num_features)) # no need for log
-        assert DEFAULT_FEAT_LBL in self.feat_lbl2idx, f"DEFAULT_FEAT_LBL {DEFAULT_FEAT_LBL} not in feat labels"
-        assert self.feat_lbl2idx[DEFAULT_FEAT_LBL] == 0, f"DEFAULT_FEAT_LBL {DEFAULT_FEAT_LBL} indexed to {self.feat_lbl2idx[DEFAULT_FEAT_LBL]}, not 0"
-
-
-        # self._cls_feat_wtM = np.log(np.ones((self.num_classes, self.num_features)))
-        # self._cls_feat_wtM = np.log(np.ones((self.num_classes, self.num_features))*10)
-        # self._cls_feat_wtM = np.log(np.ones((self.num_classes, self.num_features))/2)
-        # self._cls_feat_wtM = np.log(np.ones((self.num_classes, self.num_features))/self.num_classes)
-        # self._cls_feat_wtM = np.ones((self.num_classes, self.num_features))
-        # self._cls_feat_wtM = np.log(1/self.num_classes)
+        # assert DEFAULT_FEAT_LBL in self.feat_lbl2idx, f"DEFAULT_FEAT_LBL {DEFAULT_FEAT_LBL} not in feat labels"
+        # assert self.feat_lbl2idx[DEFAULT_FEAT_LBL] == 0, f"DEFAULT_FEAT_LBL {DEFAULT_FEAT_LBL} indexed to {self.feat_lbl2idx[DEFAULT_FEAT_LBL]}, not 0"

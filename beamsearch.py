@@ -101,6 +101,3 @@ def output_classification_result(printer, model, raw_inst_lbls, gold_tags, tags,
 def beam_search_write(f_out, raw_lbls, gold_y, X, me_model, beam_size, topN, topK):
     y_hat, probs = beam_search(me_model, X, beam_size, topN, topK)
     return output_classification_result(f_out, me_model, raw_lbls, gold_y, y_hat, probs)
-
-
-

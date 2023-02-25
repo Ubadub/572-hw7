@@ -77,15 +77,9 @@ def main():
     with open(sys_output, 'w') as f_out:
         fprint = FPRINT(f_out)
         fprint(SEP, "test data:")
-        i = 1
         for raw_lbls, gold_y, X in  process_input(boundaries, mapping):
             num_right += beam_search_write(fprint, raw_lbls, gold_y, X, me_model, beam_size, topN, topK)
-            tot += len(raw_lbls)
-
-            if i % 3 == 0:
-                f_out.flush()
-            i += 1
-
+            
     print(f"Accuracy: {num_right} / {tot} =  {num_right / tot}")
 
 if __name__ == '__main__':
